@@ -1,4 +1,5 @@
 # su-rs
+A hybrid `su`/`sudo` client written in Rust. Lets anyone belonging to the group `sudo` perform super-user actions by authenticating using *their own* credentials.
 
 ## Usage
 ### Build

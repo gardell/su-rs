@@ -1,5 +1,6 @@
 const PAM_SERVICE: &str = "su-rs";
 const DEFAULT_SHELL: &str = "/bin/sh";
+const SUDO_GROUP_NAME: &str = "sudo";
 
 use quick_error::quick_error;
 quick_error! {
@@ -7,6 +8,7 @@ quick_error! {
     pub enum Error {
         ExpectedLine {}
         GetCurrentUsername {}
+        GetUserGroups {}
         Io(err: std::io::Error) {
             from()
         }
@@ -20,6 +22,7 @@ quick_error! {
         Pam(err: pam::PamError) {
             from()
         }
+        UserNotInSudoGroup {}
     }
 }
 
@@ -56,6 +59,18 @@ impl<T: std::os::unix::io::AsRawFd> Drop for ScopedTcSetattr<T> {
 }
 
 fn main() -> Result<(), Error> {
+    let current_username = users::get_current_username().ok_or(Error::GetCurrentUsername)?;
+    users::get_user_groups(
+        &current_username,
+        users::get_user_by_name(&current_username)
+            .ok_or(Error::NoSuchUser)?
+            .primary_group_id(),
+    )
+    .ok_or(Error::GetUserGroups)?
+    .into_iter()
+    .find(|group| group.name().to_str() == Some(SUDO_GROUP_NAME))
+    .ok_or(Error::UserNotInSudoGroup)?;
+
     use clap::load_yaml;
     let yaml = load_yaml!("cli.yml");
     let matches = clap::App::from_yaml(yaml).get_matches();
@@ -105,7 +120,6 @@ fn main() -> Result<(), Error> {
     };
     eprintln!();
 
-    let current_username = users::get_current_username().ok_or(Error::GetCurrentUsername)?;
     let mut auth = pam::Authenticator::with_password(PAM_SERVICE)?;
     auth.get_handler()
         .set_credentials(current_username.to_string_lossy(), password);
