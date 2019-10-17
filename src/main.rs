@@ -68,7 +68,7 @@ fn main() -> Result<(), Error> {
     )
     .ok_or(Error::GetUserGroups)?
     .into_iter()
-    .find(|group| group.name().to_string_lossy().as_ref() == SUDO_GROUP_NAME)
+    .find(|group| group.name().to_str() == Some(SUDO_GROUP_NAME))
     .ok_or(Error::UserNotInSudoGroup)?;
 
     use clap::load_yaml;
