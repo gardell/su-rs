@@ -1,0 +1,22 @@
+name: su-rs
+version: "1.0"
+about: su written in Rust
+args:
+  - command:
+      short: c
+      long: command
+      value_name: command
+      help: Pass command to the shell with the -c option.
+      takes_value: true
+  - shell:
+      short: s
+      long: shell
+      value_name: shell
+      help: Run the specified shell instead of the default.
+      takes_value: true
+  - user:
+      required: false
+      index: 1
+  - arguments:
+      multiple: true
+      required: false
