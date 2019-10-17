@@ -1,6 +1,9 @@
 const PAM_SERVICE: &str = "su-rs";
 const DEFAULT_SHELL: &str = "/bin/sh";
 const SUDO_GROUP_NAME: &str = "sudo";
+const DEFAULT_LOGIN_PATH: &str = "/usr/local/bin:/bin:/usr/bin";
+const DEFAULT_ROOT_LOGIN_PATH: &str =
+    "/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin";
 
 use quick_error::quick_error;
 quick_error! {
@@ -23,6 +26,9 @@ quick_error! {
             from()
         }
         UserNotInSudoGroup {}
+        VarError(err: std::env::VarError) {
+            from()
+        }
     }
 }
 
@@ -78,21 +84,27 @@ fn main() -> Result<(), Error> {
     let command = std::ffi::CString::new(matches.value_of("command").unwrap_or(DEFAULT_SHELL))?;
     let shell = matches.value_of("shell").unwrap_or(DEFAULT_SHELL);
     let arguments = matches.values_of("arguments");
+    let username = matches.value_of("user").unwrap_or("root");
 
-    let user = users::get_user_by_name(matches.value_of("user").unwrap_or("root"))
-        .ok_or(Error::NoSuchUser)?;
+    let user = users::get_user_by_name(username).ok_or(Error::NoSuchUser)?;
 
     use users::os::unix::UserExt;
-    let env = std::env::vars()
-        // TODO: shell escape?
-        .map(|(key, value)| format!("{}={}", key, value))
-        .chain(std::iter::once(format!(
-            "HOME={}",
-            user.home_dir().to_string_lossy()
+    let env = std::iter::once(("TERM", std::borrow::Cow::Owned(std::env::var("TERM")?)))
+        .chain(std::iter::once(("HOME", user.home_dir().to_string_lossy())))
+        .chain(std::iter::once(("SHELL", shell.into())))
+        .chain(std::iter::once(("USER", username.into())))
+        .chain(std::iter::once(("LOGNAME", username.into())))
+        .chain(std::iter::once((
+            "PATH",
+            if user.uid() == 0 {
+                DEFAULT_ROOT_LOGIN_PATH
+            } else {
+                DEFAULT_LOGIN_PATH
+            }
+            .into(),
         )))
-        .chain(std::iter::once(format!("SHELL={}", shell)))
-        .map(std::ffi::CString::new)
-        // TODO: Making the assumption the last env variables override whatever is set
+        // TODO: shell escape?
+        .map(|(key, value)| std::ffi::CString::new(format!("{}={}", key, value)))
         .collect::<Result<Vec<_>, _>>()?;
 
     let arguments = arguments
