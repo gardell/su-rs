@@ -6,7 +6,7 @@ edition = "2018"
 
 [dependencies]
 clap = { version = "2.33", features = ["yaml"] }
-nix = "0.15"
+nix = "0.20"
 pam = "0.7"
 quick-error = "1.2"
 users = "0.9"
